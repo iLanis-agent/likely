@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Likely - AI Probability Oracle</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:-apple-system,'Segoe UI',Roboto,sans-serif; background:#0e0f1e; color:#ecedff; min-height:100vh; padding:22px 14px 60px; }
+  .wrap { max-width:680px; margin:0 auto; }
+  header { text-align:center; margin-bottom:16px; }
+  header h1 { font-size:27px; letter-spacing:-.5px; }
+  header a { color:#8b7cff; font-size:12px; text-decoration:none; }
+  .card { background:#151730; border:1px solid #252852; border-radius:14px; padding:18px; margin-bottom:12px; }
+  .lbl { font-size:11px; text-transform:uppercase; letter-spacing:1.5px; color:#7d83c0; margin-bottom:10px; }
+  input[type=password], input[type=text], textarea, select {
+    width:100%; background:#0e0f1e; border:1.5px solid #252852; border-radius:10px; color:#ecedff;
+    padding:12px 14px; font-size:15px; font-family:inherit; outline:none; }
+  input:focus, textarea:focus, select:focus { border-color:#8b7cff; }
+  textarea { resize:vertical; min-height:70px; }
+  .btn { display:inline-block; border:none; background:#8b7cff; color:#0e0f1e; font-weight:700; font-size:15px;
+    border-radius:999px; padding:12px 28px; cursor:pointer; }
+  .btn:disabled { opacity:.5; cursor:default; }
+  .btn.ghost { background:#1d2044; color:#aab0e8; font-weight:600; }
+  .row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+  .note { color:#7d83c0; font-size:12.5px; line-height:1.5; margin-top:10px; }
+  .hidden { display:none !important; }
+  #gaugeWrap { text-align:center; }
+  #bigP { font-size:46px; font-weight:800; margin-top:-58px; font-variant-numeric:tabular-nums; }
+  #verdict { font-size:14px; color:#aab0e8; margin-top:2px; }
+  #summary { text-align:center; color:#c9cdfa; font-size:14.5px; line-height:1.55; margin:14px 0 4px; }
+  .fac { display:flex; gap:10px; padding:9px 6px; border-radius:9px; align-items:baseline; }
+  .fac:nth-child(odd) { background:#191c3c; }
+  .fac .d { font-weight:800; min-width:22px; text-align:center; }
+  .fac .d.up { color:#5eead4; }
+  .fac .d.dn { color:#fb7185; }
+  .fac .fn { font-weight:600; font-size:13.5px; }
+  .fac .ft { color:#8b90cc; font-size:12.5px; margin-top:2px; line-height:1.45; }
+  ul.plain { list-style:none; }
+  ul.plain li { padding:6px 0 6px 18px; position:relative; color:#b9bdf0; font-size:13.5px; line-height:1.5; }
+  ul.plain li:before { content:'\2022'; position:absolute; left:4px; color:#8b7cff; }
+  #meta { text-align:center; color:#5b5f96; font-size:11.5px; margin-top:14px; }
+  #err { background:#2b1420; border:1px solid #5c2140; color:#fda4c0; border-radius:10px; padding:12px 14px; font-size:13.5px; line-height:1.5; }
+  .hrow { display:flex; gap:10px; align-items:baseline; padding:9px 6px; border-radius:9px; font-size:13px; cursor:pointer; }
+  .hrow:nth-child(odd) { background:#191c3c; }
+  .hrow:hover { background:#1d2044; }
+  .hrow .p { font-weight:800; min-width:44px; font-variant-numeric:tabular-nums; }
+  .hrow .q { color:#aab0e8; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .hrow .x { color:#4a4e85; background:none; border:none; cursor:pointer; font-size:14px; }
+  .hrow .x:hover { color:#fb7185; }
+  #emptyHist { color:#4a4e85; font-size:13px; text-align:center; padding:6px; }
+  #spinner { text-align:center; color:#aab0e8; font-size:14px; padding:18px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header><h1>&#128302; Likely</h1><a href="index.html">&larr; About</a></header>
+
+  <div class="card" id="setupCard">
+    <div class="lbl">One-time setup</div>
+    <p class="note" style="margin-top:0;margin-bottom:12px">Likely asks an AI model to estimate probabilities. Bring your own
+      <b>OpenRouter</b> API key - get one free at openrouter.ai/keys. The key is stored <b>only in this browser</b> (localStorage), never in the app or its code.</p>
+    <input type="password" id="keyInput" placeholder="sk-or-..." autocomplete="off">
+    <div class="row" style="margin-top:12px"><button class="btn" id="saveKey">Save key &amp; start</button></div>
+    <div class="note" id="setupErr"></div>
+  </div>
+
+  <div id="mainUI" class="hidden">
+    <div class="card">
+      <div class="lbl">Ask anything</div>
+      <textarea id="q" placeholder="Will it rain in Tel Aviv tomorrow? Will the shekel strengthen this month?"></textarea>
+      <div class="row" style="margin-top:12px">
+        <select id="model" style="flex:1;min-width:200px">
+          <option value="openai/gpt-4o-mini">GPT-4o mini - cheap default</option>
+          <option value="google/gemini-flash-1.5">Gemini Flash 1.5 - fast</option>
+          <option value="meta-llama/llama-3.1-8b-instruct">Llama 3.1 8B - budget</option>
+          <option value="anthropic/claude-3.5-haiku">Claude 3.5 Haiku - sharper</option>
+          <option value="__custom">Custom model id...</option>
+        </select>
+        <button class="btn" id="ask">Estimate</button>
+      </div>
+      <input type="text" id="customModel" class="hidden" style="margin-top:10px" placeholder="e.g. openai/gpt-4o">
+      <div class="note">Answers are AI estimates, not guarantees - treat them as an informed starting point.</div>
+    </div>
+
+    <div class="card hidden" id="spinnerCard"><div id="spinner">Thinking through the factors...</div></div>
+    <div class="card hidden" id="errCard"><div id="err"></div><div class="row" style="margin-top:10px"><button class="btn ghost" id="errKeyBtn">Change API key</button></div></div>
+
+    <div class="card hidden" id="resultCard">
+      <div id="gaugeWrap">
+        <svg width="220" height="120" viewBox="0 0 220 120">
+          <path d="M 20 110 A 90 90 0 0 1 200 110" fill="none" stroke="#252852" stroke-width="16" stroke-linecap="round"/>
+          <path id="arc" d="M 20 110 A 90 90 0 0 1 200 110" fill="none" stroke="#8b7cff" stroke-width="16" stroke-linecap="round" stroke-dasharray="283" stroke-dashoffset="283"/>
+        </svg>
+        <div id="bigP">-%</div>
+        <div id="verdict"></div>
+      </div>
+      <div id="summary"></div>
+      <div class="lbl" style="margin-top:14px">What's pushing it</div>
+      <div id="factors"></div>
+      <div class="lbl" style="margin-top:14px">Key assumptions</div>
+      <ul class="plain" id="assumptions"></ul>
+      <div class="lbl" style="margin-top:14px">What would change the estimate</div>
+      <ul class="plain" id="changers"></ul>
+      <div id="meta"></div>
+    </div>
+
+    <div class="card">
+      <div class="lbl">Past questions</div>
+      <div id="hist"><div id="emptyHist">Nothing yet - ask your first question above.</div></div>
+      <div class="row" style="margin-top:12px"><button class="btn ghost" id="forgetKey" style="font-size:12px;padding:8px 16px">Forget my API key</button></div>
+    </div>
+  </div>
+</div>
+
+<script>
+var SYS='You are a careful forecasting assistant inside a probability app. The user asks how likely something is. '+
+'Think like a superforecaster: start from base rates, weigh evidence, stay calibrated, avoid false precision. '+
+'Respond with ONLY a JSON object, no markdown, no commentary, in exactly this shape: '+
+'{"probability": <integer 0-100>, "summary": "<one sentence bottom line>", '+
+'"factors": [{"name": "<short label>", "direction": "<+ or ->", "note": "<one sentence>"}], '+
+'"assumptions": ["<assumption>", ...], "changers": ["<what would move the estimate>", ...]}. '+
+'Use 3-5 factors (+ means it raises the probability, - lowers it), 2-4 assumptions, 2-4 changers.';
+var KEY_LS='likely-key', HIST_LS='likely-hist', MODEL_LS='likely-model';
+function $(id){return document.getElementById(id);}
+function getKey(){ try{return localStorage.getItem(KEY_LS)||'';}catch(_){return '';} }
+function setKey(k){ try{localStorage.setItem(KEY_LS,k);}catch(_){}} 
+function getHist(){ try{return JSON.parse(localStorage.getItem(HIST_LS)||'[]');}catch(_){return [];} }
+function setHist(h){ try{localStorage.setItem(HIST_LS,JSON.stringify(h));}catch(_){}}
+function verdictFor(p){
+  if(p<10) return 'Very unlikely';
+  if(p<30) return 'Unlikely';
+  if(p<45) return 'Probably not';
+  if(p<=55) return 'Toss-up';
+  if(p<70) return 'More likely than not';
+  if(p<90) return 'Likely';
+  return 'Very likely';
+}
+function showSetup(msg){
+  $('setupCard').classList.remove('hidden');
+  $('mainUI').classList.add('hidden');
+  if(msg) $('setupErr').textContent=msg;
+}
+function showMain(){
+  $('setupCard').classList.add('hidden');
+  $('mainUI').classList.remove('hidden');
+}
+$('saveKey').onclick=function(){
+  var k=$('keyInput').value.trim();
+  if(k.length<10){ $('setupErr').textContent='That key looks too short - paste the full key from openrouter.ai/keys.'; return; }
+  setKey(k); $('keyInput').value=''; showMain();
+};
+$('forgetKey').onclick=function(){ try{localStorage.removeItem(KEY_LS);}catch(_){} showSetup('Key removed from this browser.'); };
+$('model').onchange=function(){
+  var c=$('model').value==='__custom';
+  $('customModel').classList.toggle('hidden', !c);
+  if(!c){ try{localStorage.setItem(MODEL_LS,$('model').value);}catch(_){}}
+};
+try{ var sm=localStorage.getItem(MODEL_LS); if(sm){ $('model').value=sm; } }catch(_){}
+function currentModel(){ return $('model').value==='__custom' ? ($('customModel').value.trim()||'openai/gpt-4o-mini') : $('model').value; }
+function extractJson(t){
+  var m=t.match(/\{[\s\S]*\}/);
+  if(!m) throw new Error('no-json');
+  return JSON.parse(m[0]);
+}
+function fail(msg, showKeyBtn){
+  $('spinnerCard').classList.add('hidden');
+  $('resultCard').classList.add('hidden');
+  $('err').textContent=msg;
+  $('errKeyBtn').style.display=showKeyBtn?'':'none';
+  $('errCard').classList.remove('hidden');
+}
+$('errKeyBtn').onclick=function(){ showSetup('Paste a fresh key from openrouter.ai/keys.'); };
+function renderResult(r, q, model, usage){
+  $('errCard').classList.add('hidden');
+  var p=Math.max(0, Math.min(100, Math.round(r.probability)));
+  $('arc').style.transition='stroke-dashoffset .8s ease';
+  $('arc').setAttribute('stroke-dashoffset', String(283*(1-p/100)));
+  $('arc').setAttribute('stroke', p<35?'#fb7185':p<65?'#fbbf24':'#5eead4');
+  $('bigP').textContent=p+'%';
+  $('verdict').textContent=verdictFor(p);
+  $('summary').textContent=r.summary||'';
+  var fh='';
+  (r.factors||[]).forEach(function(f){
+    var up=f.direction==='+';
+    fh+='<div class="fac"><span class="d '+(up?'up':'dn')+'">'+(up?'+':'-')+'</span>'+
+      '<div><div class="fn"></div><div class="ft"></div></div></div>';
+  });
+  $('factors').innerHTML=fh;
+  var facs=(r.factors||[]);
+  document.querySelectorAll('#factors .fac').forEach(function(el,i){
+    el.querySelector('.fn').textContent=facs[i].name||'';
+    el.querySelector('.ft').textContent=facs[i].note||'';
+  });
+  $('assumptions').innerHTML=(r.assumptions||[]).map(function(a){return '<li></li>';}).join('');
+  document.querySelectorAll('#assumptions li').forEach(function(li,i){ li.textContent=(r.assumptions||[])[i]; });
+  $('changers').innerHTML=(r.changers||[]).map(function(a){return '<li></li>';}).join('');
+  document.querySelectorAll('#changers li').forEach(function(li,i){ li.textContent=(r.changers||[])[i]; });
+  var meta='model: '+model;
+  if(usage && usage.total_tokens) meta+=' · '+usage.total_tokens+' tokens ('+(usage.prompt_tokens||0)+' in / '+(usage.completion_tokens||0)+' out)';
+  if(usage && usage.cost) meta+=' · ~$'+Number(usage.cost).toFixed(5);
+  $('meta').textContent=meta;
+  $('resultCard').classList.remove('hidden');
+}
+function pushHist(q, p, model, result){
+  var h=getHist();
+  h.push({q:q, p:p, model:model, ts:Date.now(), result:result});
+  if(h.length>30) h.shift();
+  setHist(h); renderHist();
+}
+function renderHist(){
+  var h=getHist();
+  if(!h.length){ $('hist').innerHTML='<div id="emptyHist">Nothing yet - ask your first question above.</div>'; return; }
+  var s='';
+  for(var i=h.length-1;i>=0;i--){
+    s+='<div class="hrow" data-i="'+i+'"><span class="p">'+h[i].p+'%</span><span class="q"></span><button class="x" data-i="'+i+'">&times;</button></div>';
+  }
+  $('hist').innerHTML=s;
+  var rows=document.querySelectorAll('#hist .hrow');
+  rows.forEach(function(row){
+    var i=parseInt(row.getAttribute('data-i'));
+    row.querySelector('.q').textContent=h[i].q;
+    row.onclick=function(e){
+      if(e.target.classList.contains('x')) return;
+      var it=getHist()[i];
+      renderResult(it.result, it.q, it.model, null);
+      window.scrollTo({top:0, behavior:'smooth'});
+    };
+  });
+  document.querySelectorAll('#hist .x').forEach(function(b){
+    b.onclick=function(){ var hh=getHist(); hh.splice(parseInt(b.getAttribute('data-i')),1); setHist(hh); renderHist(); };
+  });
+}
+$('ask').onclick=async function(){
+  var q=$('q').value.trim();
+  if(q.length<5){ $('q').focus(); return; }
+  var key=getKey(), model=currentModel();
+  if(!key){ showSetup('Add your OpenRouter key first.'); return; }
+  $('errCard').classList.add('hidden');
+  $('resultCard').classList.add('hidden');
+  $('spinnerCard').classList.remove('hidden');
+  $('ask').disabled=true;
+  try{
+    var resp=await fetch('https://openrouter.ai/api/v1/chat/completions',{
+      method:'POST',
+      headers:{'Authorization':'Bearer '+key,'Content-Type':'application/json'},
+      body:JSON.stringify({model:model, messages:[{role:'system',content:SYS},{role:'user',content:q}]})
+    });
+    if(resp.status===401||resp.status===403){ fail('OpenRouter rejected the API key. Check it on openrouter.ai/keys and paste a fresh one.', true); return; }
+    if(resp.status===402){ fail('This OpenRouter account is out of credits. Top up at openrouter.ai/credits or pick a free model.', false); return; }
+    if(resp.status===429){ fail('Rate limited by OpenRouter - give it a few seconds and try again.', false); return; }
+    if(!resp.ok){ fail('OpenRouter returned an error ('+resp.status+'). Try again or another model.', false); return; }
+    var j=await resp.json();
+    var content=j.choices&&j.choices[0]&&j.choices[0].message?j.choices[0].message.content:'';
+    var parsed;
+    try{ parsed=extractJson(content); }
+    catch(e){ fail('The model answer was not readable as an estimate. Try again - or a sharper model.', false); return; }
+    if(typeof parsed.probability!=='number'){ fail('The model did not return a probability. Try again.', false); return; }
+    var p=Math.max(0,Math.min(100,Math.round(parsed.probability)));
+    $('spinnerCard').classList.add('hidden');
+    renderResult(parsed, q, model, j.usage);
+    pushHist(q, p, model, parsed);
+  }catch(e){
+    fail('Could not reach OpenRouter - check your connection and try again.', false);
+  }finally{
+    $('ask').disabled=false;
+  }
+};
+if(getKey()) showMain(); else showSetup();
+renderHist();
+</script>
+</body>
+</html>
